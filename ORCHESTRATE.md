@@ -128,7 +128,7 @@ git add STATE.md findings/<FINDING>/ && git commit -m "<stage> result for <FINDI
 | 워커 판정 | STAGE | NEXT | BLOCKED_REASON |
 |-----------|-------|------|----------------|
 | PASS | S4 | `author` | (비움) |
-| NEEDS_REPRO | S5 | **`human`** | `NEEDS_REPRO (G<n>) — <무엇을 재현해야 하는지>` |
+| NEEDS_REPRO | S4 | `author` | (비움) — S4가 REPRO_PLAN.md와 부작용 등급을 만든다 |
 | NEEDS_HUMAN (외부 모듈) | S3 | `external` | (비움) |
 | FAIL 전부 | S1 | `hunter` | (비움) |
 
@@ -232,12 +232,59 @@ orca orchestration send --type worker_done \
 
 ---
 
+## S4 → S5 재현 게이트 — 위험도별
+
+재현이라고 다 위험한 게 아니다. **S4가 만든 `REPRO_PLAN.md`의 부작용 등급을
+코디네이터가 읽고 판단한다.**
+
+`REPRO_PLAN.md`는 반드시 아래 필드를 포함한다:
+
+```markdown
+## 부작용 등급
+LEVEL: A | B | C
+LEVEL_REASON: <왜 그 등급인지 한 줄>
+
+## 부작용 목록
+- <이 재현이 만들거나 바꾸거나 지우는 것을 전부. 경로 포함>
+
+## 격리 확인
+- 위 목록의 모든 경로가 <REPRO_ROOT> 하위인가: YES / NO
+- NO인 항목: <있으면 전부 나열>
+```
+
+| 등급 | 내용 | 처리 |
+|------|------|------|
+| **A** | 읽기 전용, HTTP 요청, 임시 DB 생성, 로그 확인만 | **자동 진행** |
+| **B** | `REPRO_ROOT` 안에서만 파일 생성·수정·삭제 | **자동 진행** (아래 검증 후) |
+| **C** | `REPRO_ROOT` 밖 경로가 하나라도 등장 / 등급 판정 불가 / 계획이 부작용을 다 열거하지 못함 | **정지, 사람 승인** |
+
+**B 등급 자동 진행 전 코디네이터가 직접 검증한다** (워커 신고를 믿지 마라):
+
+```bash
+# 계획의 모든 경로가 REPRO_ROOT 하위인지
+grep -oE '(/[A-Za-z0-9._/-]+)' findings/<FINDING>/REPRO_PLAN.md \
+  | grep -v "^<REPRO_ROOT>" | grep -vE '^/(api|action|tmp/<PROJECT>-repro)' \
+  && echo "격리 밖 경로 발견 — C로 강등, 정지"
+```
+
+**등급과 무관하게 항상 사람을 부르는 경우:**
+
+- **이 타겟의 첫 재현** — `ENV.md`의 `START_CMD`가 아직 검증 안 됐다.
+  서버 기동 명령이 무엇을 하는지 한 번은 사람이 봐야 한다.
+- 계획이 `sudo`, 시스템 경로(`/etc` `/usr` `/var`), 홈 디렉터리 직하,
+  또는 저장소 자체를 건드린다고 명시한 경우
+- 재현이 외부 네트워크로 나가는 경우 (SSRF 검증 등)
+
+**첫 재현이 끝나고 `START_CMD`/`STOP_CMD`가 `ENV.md`에 확정되면,
+그 뒤로는 A·B 등급이 자동으로 흐른다.**
+
 ## 안전 정지 조건
 
 코디네이터가 **직접 검사**한다. 워커 자기 신고에 의존하지 마라.
 
 - `NEXT: human` 또는 `DONE`
-- `STAGE: S5` 진입 — **재현은 항상 사람 승인**
+- `STAGE: S5` 진입 시 **C 등급 / 첫 재현 / sudo·시스템경로·외부네트워크** — 사람 승인
+  (A·B 등급이고 첫 재현이 아니면 자동 진행)
 - `git status`에 `ENV.md`의 SOURCE_EXT에 해당하는 소스 변경 — **규칙 위반**
 - 같은 `NEXT`가 연속 3회 — 진전 없이 맴돌고 있다
 - 워커가 `STATE.md`를 갱신하지 않음 — 계약 위반

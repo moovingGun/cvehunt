@@ -45,7 +45,8 @@ cvehunt/START.md 를 읽고 그대로 수행해라.
 ## 멈추는 조건 — 이때만 사람을 부른다
 
 - `NEXT: human` 또는 `NEXT: DONE`
-- `STAGE: S5` 진입 시도 (재현은 항상 사람 승인)
+- `STAGE: S5` 진입인데 **C 등급 / 이 타겟의 첫 재현 / sudo·시스템경로·외부네트워크**
+  (A·B 등급 + 첫 재현 아님 → 자동 진행. `ORCHESTRATE.md`의 재현 게이트 절 참조)
 - `git status`에 `ENV.md`의 SOURCE_EXT에 해당하는 소스 변경 (규칙 위반)
 - 같은 `NEXT`가 연속 3회 (진전 없음)
 - 워커가 `STATE.md`를 갱신하지 않음 (계약 위반)
