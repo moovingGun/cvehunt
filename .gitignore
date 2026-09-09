@@ -1,0 +1,10 @@
+# 타겟별 파일 — 툴킷 저장소에 들어가면 안 된다
+ENV.md
+STATE.md
+TARGET.md
+CVE_HUNT.md
+FINDINGS.md
+METRICS.md
+findings/
+!templates/FINDINGS.md
+!templates/METRICS.md
